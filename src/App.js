@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './Context/AuthContext';
 import Navbar from './components/Navbar';
 import AllStudents from './pages/AllStudents';
 import Profile from './pages/Profile';

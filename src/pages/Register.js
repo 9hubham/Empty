@@ -9,7 +9,7 @@ import {
   Alert
 } from '@mui/material';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../Context/AuthContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({
