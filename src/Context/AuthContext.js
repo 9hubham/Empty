@@ -81,9 +81,17 @@ export const AuthProvider = ({ children }) => {
       });
       loadUser();
     } catch (err) {
-      dispatch({ type: 'LOGIN_FAIL' });
-      throw new Error(err.response.data.error);
-    }
+  dispatch({ type: 'LOGIN_FAIL' });
+
+  if (err.response && err.response.data && err.response.data.error) {
+    throw new Error(err.response.data.error);
+  } else if (err.request) {
+    throw new Error('No response from server. Please check your backend or network.');
+  } else {
+    throw new Error('An error occurred: ' + err.message);
+  }
+}
+
   };
 
   // Login user
@@ -96,9 +104,17 @@ export const AuthProvider = ({ children }) => {
       });
       loadUser();
     } catch (err) {
-      dispatch({ type: 'LOGIN_FAIL' });
-      throw new Error(err.response.data.error);
-    }
+  dispatch({ type: 'LOGIN_FAIL' });
+
+  if (err.response && err.response.data && err.response.data.error) {
+    throw new Error(err.response.data.error);
+  } else if (err.request) {
+    throw new Error('No response from server. Please check your backend or network.');
+  } else {
+    throw new Error('An error occurred: ' + err.message);
+  }
+}
+
   };
 
   // Logout
