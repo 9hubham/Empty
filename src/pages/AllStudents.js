@@ -11,13 +11,15 @@ import {
   Paper,
   Chip,
   Box,
-  CircularProgress
+  CircularProgress,
+  Alert
 } from '@mui/material';
-import axios from 'axios';
+import api from '../api/config';
 
 const AllStudents = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchStudents();
@@ -25,10 +27,11 @@ const AllStudents = () => {
 
   const fetchStudents = async () => {
     try {
-      const res = await axios.get('http://localhost:8000/api/students');
+      const res = await api.get('/students');
       setStudents(res.data);
     } catch (error) {
       console.error('Error fetching students:', error);
+      setError('Failed to fetch students. Please make sure the server is running.');
     } finally {
       setLoading(false);
     }
@@ -39,6 +42,14 @@ const AllStudents = () => {
       <Box display="flex" justifyContent="center" mt={4}>
         <CircularProgress />
       </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ mt: 4 }}>
+        <Alert severity="error">{error}</Alert>
+      </Container>
     );
   }
 

@@ -7,9 +7,10 @@ const API_URL = 'http://localhost:8000/api';
 
 const initialState = {
   token: localStorage.getItem('token'),
-  isAuthenticated: null,
+  isAuthenticated: false,
   loading: true,
-  user: null
+  user: null,
+  serverError: false
 };
 
 function authReducer(state, action) {
@@ -19,7 +20,8 @@ function authReducer(state, action) {
         ...state,
         isAuthenticated: true,
         loading: false,
-        user: action.payload
+        user: action.payload,
+        serverError: false
       };
     case 'LOGIN_SUCCESS':
     case 'REGISTER_SUCCESS':
@@ -28,7 +30,8 @@ function authReducer(state, action) {
         ...state,
         ...action.payload,
         isAuthenticated: true,
-        loading: false
+        loading: false,
+        serverError: false
       };
     case 'AUTH_ERROR':
     case 'LOGIN_FAIL':
@@ -40,6 +43,13 @@ function authReducer(state, action) {
         isAuthenticated: false,
         loading: false,
         user: null
+      };
+    case 'SERVER_ERROR':
+      return {
+        ...state,
+        loading: false,
+        serverError: true,
+        isAuthenticated: false
       };
     case 'UPDATE_USER':
       return {
@@ -54,80 +64,6 @@ function authReducer(state, action) {
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Load user
-  const loadUser = async () => {
-    if (localStorage.token) {
-      setAuthToken(localStorage.token);
-    }
-
-    try {
-      const res = await axios.get(`${API_URL}/auth/me`);
-      dispatch({
-        type: 'USER_LOADED',
-        payload: res.data
-      });
-    } catch (err) {
-      dispatch({ type: 'AUTH_ERROR' });
-    }
-  };
-
-  // Register user
-  const register = async (formData) => {
-    try {
-      const res = await axios.post(`${API_URL}/auth/register`, formData);
-      dispatch({
-        type: 'REGISTER_SUCCESS',
-        payload: res.data
-      });
-      loadUser();
-    } catch (err) {
-  dispatch({ type: 'LOGIN_FAIL' });
-
-  if (err.response && err.response.data && err.response.data.error) {
-    throw new Error(err.response.data.error);
-  } else if (err.request) {
-    throw new Error('No response from server. Please check your backend or network.');
-  } else {
-    throw new Error('An error occurred: ' + err.message);
-  }
-}
-
-  };
-
-  // Login user
-  const login = async (formData) => {
-    try {
-      const res = await axios.post(`${API_URL}/auth/login`, formData);
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: res.data
-      });
-      loadUser();
-    } catch (err) {
-  dispatch({ type: 'LOGIN_FAIL' });
-
-  if (err.response && err.response.data && err.response.data.error) {
-    throw new Error(err.response.data.error);
-  } else if (err.request) {
-    throw new Error('No response from server. Please check your backend or network.');
-  } else {
-    throw new Error('An error occurred: ' + err.message);
-  }
-}
-
-  };
-
-  // Logout
-  const logout = () => dispatch({ type: 'LOGOUT' });
-
-  // Update user
-  const updateUser = (user) => {
-    dispatch({
-      type: 'UPDATE_USER',
-      payload: user
-    });
-  };
-
   // Set auth token
   const setAuthToken = (token) => {
     if (token) {
@@ -137,8 +73,128 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Test server connection
+  const testServerConnection = async () => {
+    try {
+      await axios.get(`${API_URL}/health`, { timeout: 5000 });
+      return true;
+    } catch (error) {
+      console.error('Server connection test failed:', error.message);
+      return false;
+    }
+  };
+
+  // Load user
+  const loadUser = async () => {
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      dispatch({ type: 'AUTH_ERROR' });
+      return;
+    }
+
+    // Test server connection first
+    const serverOnline = await testServerConnection();
+    if (!serverOnline) {
+      dispatch({ type: 'SERVER_ERROR' });
+      return;
+    }
+
+    setAuthToken(token);
+
+    try {
+      const res = await axios.get(`${API_URL}/auth/me`, { timeout: 5000 });
+      dispatch({
+        type: 'USER_LOADED',
+        payload: res.data
+      });
+    } catch (err) {
+      console.error('Load user error:', err);
+      dispatch({ type: 'AUTH_ERROR' });
+    }
+  };
+
+  // Register user
+  const register = async (formData) => {
+    try {
+      // Test server connection first
+      const serverOnline = await testServerConnection();
+      if (!serverOnline) {
+        throw new Error('Server is not available. Please make sure the backend is running on port 8000.');
+      }
+
+      const res = await axios.post(`${API_URL}/auth/register`, formData, { timeout: 10000 });
+      dispatch({
+        type: 'REGISTER_SUCCESS',
+        payload: res.data
+      });
+      
+      // Set token and load user data
+      setAuthToken(res.data.token);
+      dispatch({
+        type: 'USER_LOADED',
+        payload: res.data.user
+      });
+    } catch (err) {
+      dispatch({ type: 'LOGIN_FAIL' });
+      if (err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK') {
+        throw new Error('Cannot connect to server. Please make sure the backend is running on port 8000.');
+      }
+      throw new Error(err.response?.data?.error || err.message);
+    }
+  };
+
+  // Login user
+  const login = async (formData) => {
+    try {
+      // Test server connection first
+      const serverOnline = await testServerConnection();
+      if (!serverOnline) {
+        throw new Error('Server is not available. Please make sure the backend is running on port 8000.');
+      }
+
+      const res = await axios.post(`${API_URL}/auth/login`, formData, { timeout: 10000 });
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: res.data
+      });
+      
+      // Set token and load user data
+      setAuthToken(res.data.token);
+      dispatch({
+        type: 'USER_LOADED',
+        payload: res.data.user
+      });
+    } catch (err) {
+      dispatch({ type: 'LOGIN_FAIL' });
+      if (err.code === 'ECONNABORTED' || err.code === 'ERR_NETWORK') {
+        throw new Error('Cannot connect to server. Please make sure the backend is running on port 8000.');
+      }
+      throw new Error(err.response?.data?.error || err.message);
+    }
+  };
+
+  // Logout
+  const logout = () => {
+    setAuthToken(null);
+    dispatch({ type: 'LOGOUT' });
+  };
+
+  // Update user
+  const updateUser = (user) => {
+    dispatch({
+      type: 'UPDATE_USER',
+      payload: user
+    });
+  };
+
   useEffect(() => {
-    loadUser();
+    // Only try to load user if we have a token
+    if (localStorage.getItem('token')) {
+      loadUser();
+    } else {
+      dispatch({ type: 'AUTH_ERROR' });
+    }
   }, []);
 
   return (
@@ -148,7 +204,8 @@ export const AuthProvider = ({ children }) => {
         register,
         login,
         logout,
-        updateUser
+        updateUser,
+        testServerConnection
       }}
     >
       {children}
